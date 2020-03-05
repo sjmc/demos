@@ -2,6 +2,14 @@
 ## experimenting with rFIA ###
 #https://cran.r-project.org/web/packages/rFIA/readme/README.html
 
+##################################################3
+pdat <- function(x){
+  print.data.frame(x)
+}
+
+library(dplyr)
+
+##################################################
 # rFIA: Unlocking the FIA Database in R
 # CRAN status  Travis build status Lifecycle: maturing
 
@@ -190,3 +198,94 @@ head(tpaRI)
 tpaRI$YEAR
 # 2014-2018
 ######################################################
+library(rFIA)
+
+# this downloads a fresh copy from the web to a local file
+ca <- getFIA(states = 'CA', dir = 'C:/Users/stellac/Documents/Local_Data/rFIA_trial')
+
+# this is for when you've downloaded the data already to a local directory
+#db <- readFIA('C:/Users/stellac/Documents/Local_Data/rFIA_trial/')
+
+
+### All years (should be since 2001...)
+fiaCA_all <- clipFIA(ca, mostRecent = FALSE)
+# appears to only go back to 2005. 
+
+# extract the TPA table (no longer a FIA database object, but instead a table)
+tpa_fiaCA_all <- tpa(fiaCA_all)
+
+## Only estimates for the most recent inventory year
+fiaCA_MR <- clipFIA(ca, mostRecent = TRUE) ## subset the most recent data
+tpaCA_MR <- tpa(fiaCA_MR)
+
+## what years?
+tpa_fiaCA_all$YEAR
+#2005-2018 cool.... but not all the data.
+
+# Take a look
+#plotFIA(tpa_fiaCA_all, BAA, se = TRUE, plot.title = 'Basal area per acre over time')
+#doesn't work
+
+###What if I want to group estimates by species? How about by size class?
+
+## Group estimates by species
+tpaCA_species <- tpa(fiaCA_all, bySpecies = TRUE)
+# chokes on this a bit...
+tpaCA_species_MR <- tpa(fiaCA_MR, bySpecies = TRUE)
+
+dim(tpaCA_species) # 1296
+dim(tpaCA_species_MR) #234
+head(tpaCA_species_MR, n = 100)
+pdat(tpaCA_species_MR[,1:5])
+
+pdat(arrange(tpaCA_species_MR[,1:6], TPA))
+View(arrange(tpaCA_species_MR[1:234,c(1:6,13)], TPA))
+
+## Weird! 
+# this returns TPA and BAA and nplots_TREE. Highest TPA make plenty of sense, but list is packed with non-CA species, and not likely found at the densities calculated (eastern hophornbeam, probably not 0.44 trees per acre throughout CA. Could be that this is TPA in the plot where found, but I honestly don't think there are this many species code errors. Most are common eastern species. Strangest is sweet birch 2.92 TPA, also silly is 262 plots with red maple! NONonno.)
+
+# Produces tree per acre (TPA) and basal area per acre (BAA) estimates from FIA data, along with
+# population totals for each variable. Estimates can be produced for regions defined within the FIA
+# Database (e.g. counties), at the plot level, or within user-defined areal units. Options to group
+# estimates by species, size class, and other variables defined in the FIADB. If multiple reporting
+# years (EVALIDs) are included in the data, estimates will be output as a time series. If multiple
+# states are represented by the data, estimates will be output for the full region (all area combined),
+# unless specified otherwise (e.g. grpBy = STATECD). Easy options to implement parallel processing.
+
+
+## Group estimates by size class
+## NOTE: Default 2-inch size classes, but you can make your own using makeClasses()
+tpaCA_sizeClass <- tpa(fiaCA_MR, bySizeClass = TRUE)
+head(tpaCA_sizeClass, n = 3)
+
+
+## Group by species and size class, and plot the distCAbution 
+##  for the most recent inventory year
+tpaCA_spsc <- tpa(fiaCA_MR, bySpecies = TRUE, bySizeClass = TRUE)
+plotFIA(tpaCA_spsc, BAA, grp = COMMON_NAME, x = sizeClass,
+        plot.title = 'Size-class distCAbutions of BAA by species', 
+        x.lab = 'Size Class (inches)', text.size = .75,
+        n.max = 5) # Only want the top 5 species, try n.max = -5 for bottom 5
+
+tpaCA_own <- tpa(fiaCA_MR, 
+                 grpBy = OWNGRPCD, 
+                 treeDomain = DIA > 12 & CCLCD %in% c(1,2),
+                 areaDomain = PHYSCLCD %in% c(20:29))
+head(tpaCA_own)
+
+data('countiesCA')
+
+tpaCA_counties <- tpa(fiaCA_MR, polys = countiesCA, returnSpatial = TRUE)
+
+## NOTE: Any grey polygons below simply means no FIA data was available for that region
+plotFIA(tpaCA_counties, BAA) # Plotting method for spatial FIA summaCAes, also try 'TPA' or 'TPA_PERC'
+
+## Using the full FIA dataset, all available inventoCAes
+tpaCA_st <- tpa(fiaCA, polys = countiesCA, returnSpatial = TRUE)
+
+## Animate the output
+plotFIA(tpaCA_st, TPA, animate = TRUE, legend.title = 'Abundance (TPA)', legend.height = .8)
+
+## what years?
+head(tpaCA)
+tpaCA$YEAR
